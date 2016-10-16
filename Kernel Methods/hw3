@@ -1,0 +1,159 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+from sklearn import cross_validation, svm
+from sklearn.grid_search import GridSearchCV
+from sklearn.cross_validation import KFold
+from sklearn.multiclass import OneVsRestClassifier
+
+def stripCommas(fileName):
+    f = open('ps3_data/' + fileName, 'r')
+    newListFile = []
+    last = 784
+    for line in f:
+        newLine = line.split(',')
+        newLine[last] = newLine[last].strip()       #strip newline
+        newListFile.append(newLine)
+    f.close()
+    return newListFile
+
+#read from file, convert each digit into labelvector data based on result vector
+#2a
+def featureVectors(fileName, numLines):
+    counter = 0
+    featureVectorLength = 784
+    featureVectorList = np.zeros((numLines, featureVectorLength))
+    labelVector = np.zeros((numLines))
+    fileWithoutCommas = stripCommas(fileName)
+    for digit in fileWithoutCommas:
+        i = 0
+        features = np.zeros(featureVectorLength)
+        for feature in digit:
+            if (i == 0):
+                labelVector[counter] = digit[i]
+            else:
+                feature = (int(feature)*2)/255 - 1
+                features[i - 1] = feature
+            i += 1
+        featureVectorList[counter] = features
+        counter += 1
+    return (featureVectorList, labelVector)
+
+def pegasos_svm_train(data, label, myLambda):
+    t = 0
+    numMistakes = 0
+    totalHingeLoss = 0
+    maxPasses = 20
+    featureVectorLength = 784
+    svmObjective = []
+    w = np.zeros(featureVectorLength)
+    for i in range(maxPasses):
+        for j in range(len(data)):
+            t += 1
+            eta = 1/(t*myLambda)
+            prediction = label[j] * np.dot(w, data[j])
+            #use support vectors
+            if (prediction) < 1:
+                w = ((1-(eta*myLambda)) * w) + (eta * label[j] * data[j])
+            else:
+                w = ((1-(eta*myLambda)) * w)
+            #use classifier
+            if (prediction) < 0:
+                numMistakes +=1
+        hingeLoss = 0
+        for k in range(len(data)):
+            hingeLoss += max(0, 1 - label[i]*np.dot(data[i], w))
+        hingeLoss = hingeLoss / len(label)
+        totalHingeLoss += hingeLoss
+        svmObjective.append((t, ((myLambda/2) * math.pow(np.linalg.norm(w), 2)) + hingeLoss))
+    return (w, svmObjective, numMistakes/(maxPasses*len(data)), totalHingeLoss/maxPasses)
+
+def relabel(labels, num):
+    relabeled = []
+    for label in labels:
+        if (int(label) != num):
+            relabeled.append(-1)
+        else:
+            relabeled.append(1)
+    return relabeled
+
+def runIt():
+    trainData, trainLabel = featureVectors('mnist_train.txt', 2000)
+    testData, testLabel = featureVectors('mnist_test.txt', 1000)
+    run2b(trainData, trainLabel)
+    run2c(trainData, trainLabel, testData, testLabel)
+    run2d(trainData, trainLabel, testData, testLabel)
+    run2e(trainData, trainLabel)
+    run2f(trainData, trainLabel, testData, testLabel)
+
+
+def run2b(trainData, trainLabel):
+    trainLabel0 = (relabel(trainLabel, 0))
+    trainLabel1 = (relabel(trainLabel, 1))
+    trainLabel2 = (relabel(trainLabel, 2))
+    trainLabel3 = (relabel(trainLabel, 3))
+    trainLabel4 = (relabel(trainLabel, 4))
+    trainLabel5 = (relabel(trainLabel, 5))
+    trainLabel6 = (relabel(trainLabel, 6))
+    trainLabel7 = (relabel(trainLabel, 7))
+    trainLabel8 = (relabel(trainLabel, 8))
+    trainLabel9 = (relabel(trainLabel, 9))
+
+    weight0, svm, error, hinge = pegasos_svm_train(trainData, trainLabel0, -5)
+    weight1, svm, error, hinge = pegasos_svm_train(trainData, trainLabel1, -5)
+    weight2, svm, error, hinge = pegasos_svm_train(trainData, trainLabel2, -5)
+    weight3, svm, error, hinge = pegasos_svm_train(trainData, trainLabel3, -5)
+    weight4, svm, error, hinge = pegasos_svm_train(trainData, trainLabel4, -5)
+    weight5, svm, error, hinge = pegasos_svm_train(trainData, trainLabel5, -5)
+    weight6, svm, error, hinge = pegasos_svm_train(trainData, trainLabel6, -5)
+    weight7, svm, error, hinge = pegasos_svm_train(trainData, trainLabel7, -5)
+    weight8, svm, error, hinge = pegasos_svm_train(trainData, trainLabel8, -5)
+    weight9, svm, error, hinge = pegasos_svm_train(trainData, trainLabel9, -5)
+
+def run2c(trainData, trainLabel, testData, testLabel):
+    clf = svm.SVC(kernel='linear')
+    C_s = [math.pow(2, -5), math.pow(2, -4), math.pow(2, -3), math.pow(2, -2), math.pow(2, -1), math.pow(2, 0), math.pow(2, 1)]
+
+    scores = list()
+    for C in C_s:
+        clf.C = 1/ (C * len(trainData))
+        thisScores = 1 - cross_validation.cross_val_score(clf, trainData, trainLabel, cv=5)
+        scores.append(np.mean(thisScores))
+
+    #plot
+    plt.clf()
+    plt.semilogx(C_s, scores, basex=2)
+    plt.ylabel('CV score')
+    plt.xlabel('Lambda')
+    plt.ylim(0.05, .2)
+    plt.show()
+
+    clf.C = 1/ (math.pow(2, -3) * len(trainData))
+    clf.fit(trainData, trainLabel)
+    print('2c test error',
+          1 - clf.score(testData, testLabel))
+
+def run2d(trainData, trainLabel, testData, testLabel):
+    clf = OneVsRestClassifier(svm.SVC())
+    clf.fit(trainData, trainLabel)
+    print('2d test error', 1 - clf.score(testData, testLabel))
+
+def run2e(trainData, trainLabel):
+    clf = OneVsRestClassifier(svm.SVC())
+    print('2e cross validation error', np.mean(1 - cross_validation.cross_val_score(clf, trainData, trainLabel, cv=10)))
+
+def run2f(trainData, trainLabel, testData, testLabel):
+    clf = OneVsRestClassifier(svm.SVC())
+    gamma_range = np.logspace(-1.8, -1.8, 1)
+    C_s = np.logspace(0.6, 0.6, 1)
+    param_grid = dict(estimator__gamma=gamma_range, estimator__C=C_s)
+    cv = KFold(len(trainData), n_folds=10)
+    grid = GridSearchCV(clf, param_grid=param_grid, cv=cv)
+    grid.fit(trainData, trainLabel)
+
+    print("The best parameters are %s with a cross validation error of %0.5f"
+      % (grid.best_params_, 1 - grid.best_score_))
+
+    print('2f test error', 1 - grid.score(testData, testLabel))
+
+runIt()
