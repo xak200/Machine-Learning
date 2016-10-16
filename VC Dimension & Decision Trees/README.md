@@ -1,2 +1,2 @@
-The Adult Dataset (Blake and Merz, 1998) was extracted from the 1994 Census database.
+The Adult Dataset (Blake and Merz, 1998) was extracted from the 1994 Census database. <br />
 The task for this dataset was to determine whether a person would make over 50k a year. Out of 48,842 samples, it has about 24% positive (income >50K) and 76% negative (income <=50K) samples; some of the features have missing values (marked by '?') and there are 4 continuous and 8 categorical features.
